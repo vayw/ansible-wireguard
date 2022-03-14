@@ -1,0 +1,7 @@
+---
+# defaults file for wireguard
+
+wireguard_iface: wg0
+wireguard_net_prefix: 24
+wireguard_server_ip: 192.168.100.1
+wireguard_server_port: 51820
