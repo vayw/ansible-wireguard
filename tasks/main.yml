@@ -10,24 +10,23 @@
       notify:
         - reload_systemd
 
-- name: wireguard configuration
+- name: network connection
   block:
-    - name: Create WireGuard configurations directory
-      file:
-        dest: /etc/wireguard
-        state: directory
-
-    - name: Generate WireGuard configuration file
+    - name: network manager configuration
       template:
         src: wireguard.conf.j2
-        dest: "/etc/wireguard/{{ wireguard_iface }}.conf"
+        dest: "{{ wireguard_nm_connections_folder }}/{{ wireguard_iface }}.nmconnection"
         owner: root
         group: root
         mode: 0600
-      notify:
-        - reload_service
+        force: yes
+      register: nmconnection
 
-- name: network configuration
+    - name: reload interface
+      ansible.builtin.command: "nmcli c reload"
+      when: nmconnection.changed
+
+- name: netfiler and ip forwarding configuration
   block:
     - name: Enable packet forwarding for IPv4
       sysctl:
@@ -80,9 +79,3 @@
         state: enabled
         permanent: yes
         immediate: yes
-
-    - name: Enable and start wireguard
-      ansible.builtin.service:
-        name: "wg-quick@{{ wireguard_iface }}"
-        state: started
-        enabled: yes

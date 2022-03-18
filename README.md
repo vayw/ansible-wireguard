@@ -1,22 +1,30 @@
-Role Name
+Wireguard Role
 =========
 
-A brief description of the role goes here.
+Simple wireguard role
 
 Requirements
 ------------
 
-Any pre-requisites that may not be covered by Ansible itself or the role should be mentioned here. For instance, if the role uses the EC2 module, it may be a good idea to mention in this section that the boto package is required.
+no requirements
 
 Role Variables
 --------------
 
-A description of the settable variables for this role should go here, including any variables that are in defaults/main.yml, vars/main.yml, and any variables that can/should be set via parameters to the role. Any variables that are read from other roles and/or the global scope (ie. hostvars, group vars, etc.) should be mentioned here as well.
+wireguard_iface: wg0
+wireguard_net prefix: 24
+wireguard_server_ip: 192.168.100.1
+wireguard_server_port: 51820
+
+wireguard_nm_connections_folder: /etc/NetworkManager/system-connections
+
+wireguard_private_key
+wireguard_clients
 
 Dependencies
 ------------
 
-A list of other roles hosted on Galaxy should go here, plus any details in regards to parameters that may need to be set for other roles, or variables that are used from other roles.
+no dependencies
 
 Example Playbook
 ----------------
@@ -25,7 +33,12 @@ Including an example of how to use your role (for instance, with variables passe
 
     - hosts: servers
       roles:
-         - { role: username.rolename, x: 42 }
+         - role: wireguard
+           vars:
+             wireguard_private_key: <safely hidden server private key>
+             wireguard_clients:
+               - ["August", "192.168.100.2", "<August_public_key>"]
+               - ["Mihail", "192.168.100.3", "<Mihail_public_key>"]
 
 License
 -------
@@ -35,4 +48,4 @@ BSD
 Author Information
 ------------------
 
-An optional section for the role authors to include contact information, or a website (HTML is not allowed).
+vayw

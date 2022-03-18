@@ -1,0 +1,24 @@
+# server
+[connection]
+id={{ wireguard_iface }}
+type=wireguard
+interface-name={{ wireguard_iface }}
+autoconnect=true
+permissions=
+
+[wireguard]
+listen-port={{ wireguard_server_port }}
+private-key={{ wireguard_private_key }}
+private-key-flags=0
+
+{% for name, key, ip in wireguard_clients %}
+# {{ name }}
+[wireguard-peer.{{ key }}]
+allowed-ips={{ ip }}/32
+{% endfor %}
+
+[ipv4]
+address1={{ wireguard_server_ip }}/{{ wireguard_net_prefix }}
+method=manual
+
+[proxy]
