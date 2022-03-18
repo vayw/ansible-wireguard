@@ -3,6 +3,15 @@ Wireguard Role
 
 Simple wireguard role
 
+You have to generate private server key before running playbook
+
+To do so you can try to use openssl:
+```
+openssl genpkey -algorithm X25519 -outform der | tail -c 32 | base64
+```
+
+or use graphical wireguard client
+
 Requirements
 ------------
 
@@ -12,13 +21,17 @@ Role Variables
 --------------
 ```
 wireguard_iface: wg0
+
 wireguard_net prefix: 24
+
 wireguard_server_ip: 192.168.100.1
+
 wireguard_server_port: 51820
 
 wireguard_nm_connections_folder: /etc/NetworkManager/system-connections
 
 wireguard_private_key
+
 wireguard_clients
 ```
 
