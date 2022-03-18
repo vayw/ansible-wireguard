@@ -10,7 +10,7 @@ no requirements
 
 Role Variables
 --------------
-
+```
 wireguard_iface: wg0
 wireguard_net prefix: 24
 wireguard_server_ip: 192.168.100.1
@@ -20,6 +20,7 @@ wireguard_nm_connections_folder: /etc/NetworkManager/system-connections
 
 wireguard_private_key
 wireguard_clients
+```
 
 Dependencies
 ------------
