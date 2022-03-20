@@ -8,3 +8,7 @@ wireguard_server_port: 51820
 
 # Network manager
 wireguard_nm_connections_folder: /etc/NetworkManager/system-connections
+
+# Firewalld
+wireguard_firewalld_service_zone: public
+wireguard_firewalld_zone: internal

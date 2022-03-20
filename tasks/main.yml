@@ -7,8 +7,6 @@
       ansible.builtin.dnf:
         name: wireguard-tools
         state: latest
-      notify:
-        - reload_systemd
 
 - name: network connection
   block:
@@ -49,32 +47,33 @@
       ansible.builtin.command: "firewall-cmd --reload"
       when: firewalld_service.changed
 
-    - name: Allow WireGuard service for FirewallD public zone
+    - name: Allow WireGuard service for FirewallD zone
       firewalld:
-        zone: public
+        zone: "{{ wireguard_firewalld_service_zone }}"
         service: wireguard
         state: enabled
         permanent: yes
         immediate: yes
 
-    - name: Add WireGuard interface to FirewallD public zone
+    - name: Add WireGuard interface to FirewallD zone
       firewalld:
-        zone: internal
-        interface: wg0
+        zone: "{{ wireguard_firewalld_zone }}"
+        interface: "{{ wireguard_iface }}"
         state: enabled
         permanent: yes
         immediate: yes
 
     - name: Enable Masquerading
       firewalld:
-        zone: public
+        zone: "{{ wireguard_firewalld_service_zone }}"
         masquerade: yes
         state: enabled
         permanent: yes
         immediate: yes
+
     - name: Enable Masquerading for internal zone
       firewalld:
-        zone: internal
+        zone: "{{ wireguard_firewalld_zone }}"
         masquerade: yes
         state: enabled
         permanent: yes
