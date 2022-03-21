@@ -20,8 +20,11 @@
         force: yes
       register: nmconnection
 
-    - name: reload interface
+    - name: reload connection
       ansible.builtin.command: "nmcli c reload"
+      when: nmconnection.changed
+    - name: reapply config to interface
+      ansible.builtin.command: "nmcli d reapply {{ wireguard_iface }}"
       when: nmconnection.changed
 
 - name: netfiler and ip forwarding configuration

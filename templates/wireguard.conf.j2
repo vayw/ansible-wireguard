@@ -5,6 +5,7 @@ type=wireguard
 interface-name={{ wireguard_iface }}
 autoconnect=true
 permissions=
+zone={{ wireguard_firewalld_zone }}
 
 [wireguard]
 listen-port={{ wireguard_server_port }}
