@@ -1,17 +1,21 @@
 ---
 # tasks file for wireguard
-- name: system configuration
+- name: system setup
   tags: system
-  block:
-    - name: install wireguard tools
-      ansible.builtin.dnf:
-        name: wireguard-tools
-        state: latest
+  include_tasks: "{{ ansible_distribution }}_{{ ansible_distribution_major_version }}.yml"
+
 
 - name: network connection
   block:
+    - name: check nm connections folder
+      ansible.builtin.file:
+        path: "{{ wireguard_nm_connections_folder }}"
+        owner: root
+        mode: "0755"
+        state: directory
+
     - name: network manager configuration
-      template:
+      ansible.builtin.template:
         src: wireguard.conf.j2
         dest: "{{ wireguard_nm_connections_folder }}/{{ wireguard_iface }}.nmconnection"
         owner: root

@@ -1,0 +1,9 @@
+---
+# setup tasks for centos 8
+- name: install packages
+  tags: system
+  block:
+    - name: install wireguard tools
+      ansible.builtin.dnf:
+        name: wireguard-tools
+        state: latest

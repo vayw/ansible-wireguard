@@ -1,0 +1,7 @@
+---
+# setup tasks for Debian 11
+- name: install packages
+  tags: system
+  ansible.builtin.package:
+    name: ["wireguard", "firewalld", "network-manager"]
+    state: present
