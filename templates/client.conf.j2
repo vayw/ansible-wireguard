@@ -1,6 +1,6 @@
 [Interface]
-PrivateKey = {{ wireguard_clients_keys[name] }}
-Address = {{ wireguard_clients_ips[name] }}
+PrivateKey = {{ wireguard_clients_keys[item] }}
+Address = {{ wireguard_clients_ips[item] }}
 
 [Peer]
 PublicKey = {{ wireguard_pub_key }}
