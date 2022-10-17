@@ -187,7 +187,7 @@
       register: nmconnection
 
     - name: check iface is present
-      ansible.builtin.shell: "nmcli device show {{ wireguard_iface }}"
+      ansible.builtin.shell: "nmcli device show {{ wireguard_iface }} || true"
       register: nm_device_status
       changed_when: false
 
