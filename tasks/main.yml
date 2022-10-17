@@ -4,84 +4,277 @@
   tags: system
   include_tasks: "{{ ansible_distribution }}_{{ ansible_distribution_major_version }}.yml"
 
+- name: check wg files folder
+  ansible.builtin.file:
+    path: "{{ wireguard_files }}"
+    owner: root
+    mode: "0755"
+    state: directory
 
-- name: network connection
+- name: check wg clients folder
+  ansible.builtin.file:
+    path: "{{ wireguard_files }}/clients"
+    owner: root
+    mode: "0755"
+    state: directory
+
+- name: copy ip db script
+  ansible.builtin.copy:
+    src: ip.py
+    dest: "{{ wireguard_files }}/ip.py"
+    mode: '0744'
+
+- name: Register if config/private key already exists on target host
+  ansible.builtin.stat:
+    path: "{{ wireguard_files }}/private.key"
+  register: wireguard_private_key_file
+  tags:
+    - wg-generate-keys
+    - wg-config
+
+- name: generate server key
+  when:
+    - not wireguard_private_key_file.stat.exists
+    - wireguard_private_key is not defined
   block:
-    - name: check nm connections folder
-      ansible.builtin.file:
-        path: "{{ wireguard_nm_connections_folder }}"
-        owner: root
-        mode: "0755"
-        state: directory
+    - name: Generate WireGuard private key
+      ansible.builtin.command: "wg genkey"
+      register: wireguard__register_private_key
+      changed_when: false
 
-    - name: network manager configuration
+    - name: save to file
+      ansible.builtin.copy:
+        content: "{{ wireguard__register_private_key.stdout }}"
+        dest: "{{ wireguard_files }}/private.key"
+
+    - name: Set private key fact
+      ansible.builtin.set_fact:
+        wireguard_private_key: "{{ wireguard__register_private_key.stdout }}"
+
+
+- name: read server key
+  tags: wg-config
+  when:
+    - wireguard_private_key_file.stat.exists
+    - wireguard_private_key is not defined
+  block:
+    - name: read from file
+      ansible.builtin.slurp:
+        src: "{{ wireguard_files }}/private.key"
+      register: wireguard__register_private_key_file
+      changed_when: false
+
+    - name: Set private key fact from file
+      ansible.builtin.set_fact:
+        wireguard_private_key: "{{ wireguard__register_private_key_file['content'] | b64decode }}"
+
+- name: set server public key
+  tags: wg-config, getconfigs
+  block:
+    - name: generate pubkey
+      ansible.builtin.command: "echo {{ wireguard_private_key }} | wg pubkey"
+      register: wireguard__register_public_key
+      changed_when: false
+    - name: set pubkey fact
+      ansible.builtin.set_fact:
+        wireguard_pub_key: "{{ wireguard__register_public_key.stdout }}"
+
+- name: process clients
+  tags: wg-clients, getconfigs
+  block:
+    - name: check client key exists
+      ansible.builtin.stat:
+        path: "{{ wireguard_files }}/clients/{{ item }}.key"
+      register: wireguard_client_key_file
+      with_items: "{{ wireguard_clients }}"
+
+    - name: read from file
+      when: item.stat.exists
+      ansible.builtin.slurp:
+        src: "{{ wireguard_files }}/clients/{{ item.item }}.key"
+      register: wireguard_client_files_content
+      changed_when: false
+      loop: "{{ wireguard_client_key_file['results'] }}"
+      loop_control:
+        label: "{{ item.item }}"
+
+    - name: Set private key fact from file
+      when:
+        - not wireguard_client_files_content.skipped
+        - item.item.stat.exists
+      ansible.builtin.set_fact:
+        wireguard_clients_keys: "{{ wireguard_clients_keys| default({}) | combine( {item.item.item: item['content'] | b64decode} ) }}"
+      loop: "{{ wireguard_client_files_content['results'] }}"
+      loop_control:
+        label: "{{ item.item.item }}"
+
+    - name: generate client key
+      when: not item.stat.exists
+      ansible.builtin.command: "wg genkey"
+      register: wireguard_clients_private_keys_g
+      loop: "{{ wireguard_client_key_file['results'] }}"
+      loop_control:
+        label: "{{ item.item }}"
+
+    - name: append generated private key
+      when:
+        - item.stdout | default(False)
+      ansible.builtin.set_fact:
+        wireguard_clients_keys: "{{ wireguard_clients_keys| default({}) | combine( {item.item.item: item.stdout} ) }}"
+      loop: "{{ wireguard_clients_private_keys_g['results'] }}"
+      loop_control:
+        label: "{{ item.item.item }}"
+
+    - name: save to file
+      when:
+        - not wireguard_clients_private_keys_g.skipped
+        - not keygen.item.stat.exists
+      ansible.builtin.copy:
+        content: "{{ keygen.stdout }}"
+        dest: "{{ wireguard_files }}/clients/{{ keygen.item.item }}.key"
+      loop: "{{ wireguard_clients_private_keys_g['results'] }}"
+      loop_control:
+        loop_var: keygen
+        label: "{{ keygen.item.item }}"
+
+    - name: generate pubkeys from saved private keys
+      ansible.builtin.shell: "echo {{ item.value }} | wg pubkey"
+      register: _wireguard_clients_pubkeys
+      changed_when: false
+      with_dict: "{{ wireguard_clients_keys }}"
+      loop_control:
+        label: "{{ item.key }}"
+
+    - name: Set pubkeys
+      ansible.builtin.set_fact:
+        wireguard_clients_pubkeys: "{{ wireguard_clients_pubkeys| default({}) | combine( {item.item.key: item.stdout } ) }}"
+      loop: "{{ _wireguard_clients_pubkeys['results'] }}"
+      loop_control:
+        label: "{{ item.item.key }}"
+
+    - name: set peer ip
+      ansible.builtin.command: "{{ wireguard_files }}/ip.py {{ item }} {{ wireguard_files }}/ip.db {{ wireguard_server_ip }} {{ wireguard_net_prefix }}"
+      register: _wireguard_client_ip
+      changed_when: false
+      with_items: "{{ wireguard_clients }}"
+
+    - name: Set peer ips
+      ansible.builtin.set_fact:
+        wireguard_clients_ips: "{{ wireguard_clients_ips | default({}) | combine( {item.item: item.stdout } ) }}"
+      loop: "{{ _wireguard_client_ip['results'] }}"
+      loop_control:
+        label: "{{ item.item }}"
+
+    - name: network connection
+      block:
+        - name: check nm connections folder
+          ansible.builtin.file:
+            path: "{{ wireguard_nm_connections_folder }}"
+            owner: root
+            mode: "0755"
+            state: directory
+
+        - name: network manager configuration
+          ansible.builtin.template:
+            src: wireguard.conf.j2
+            dest: "{{ wireguard_nm_connections_folder }}/{{ wireguard_iface }}.nmconnection"
+            owner: root
+            group: root
+            mode: 0600
+            force: yes
+          register: nmconnection
+
+        - name: check iface is present
+          ansible.builtin.shell: "nmcli device show {{ wireguard_iface }}"
+          register: nm_device_status
+          changed_when: false
+
+        - name: reload connection
+          ansible.builtin.command: "nmcli c reload"
+          when: nmconnection.changed or
+                "connected" not in nm_device_status.stdout
+        - name: reapply config to interface
+          ansible.builtin.command: "nmcli d reapply {{ wireguard_iface }}"
+          when: nmconnection.changed
+
+    - name: netfiler and ip forwarding configuration
+      block:
+        - name: Enable packet forwarding for IPv4
+          sysctl:
+            name: net.ipv4.ip_forward
+            value: 1
+            sysctl_set: yes
+            state: present
+            reload: yes
+
+        - name: Add WireGuard as a service to FirewallD
+          template:
+            src: firewalld.xml.j2
+            dest: /etc/firewalld/services/wireguard.xml
+            owner: root
+            group: root
+            mode: 0600
+          register: firewalld_service
+
+        - name: Reload firewalld to add/update wireguard service
+          ansible.builtin.command: "firewall-cmd --reload"
+          when: firewalld_service.changed
+
+        - name: Allow WireGuard service for FirewallD zone
+          firewalld:
+            zone: "{{ wireguard_firewalld_service_zone }}"
+            service: wireguard
+            state: enabled
+            permanent: yes
+            immediate: yes
+
+        - name: Add WireGuard interface to FirewallD zone
+          firewalld:
+            zone: "{{ wireguard_firewalld_zone }}"
+            interface: "{{ wireguard_iface }}"
+            state: enabled
+            permanent: yes
+            immediate: yes
+
+        - name: Enable Masquerading
+          firewalld:
+            zone: "{{ wireguard_firewalld_service_zone }}"
+            masquerade: yes
+            state: enabled
+            permanent: yes
+            immediate: yes
+
+        - name: Enable Masquerading for internal zone
+          firewalld:
+            zone: "{{ wireguard_firewalld_zone }}"
+            masquerade: yes
+            state: enabled
+            permanent: yes
+            immediate: yes
+
+- name: Generate peer configs
+  tags: [never, getconfigs]
+  block:
+    - name: generate peer config
       ansible.builtin.template:
-        src: wireguard.conf.j2
-        dest: "{{ wireguard_nm_connections_folder }}/{{ wireguard_iface }}.nmconnection"
+        src: client.conf.j2
+        dest: "{{ wireguard_files }}/{{ item }}.conf"
         owner: root
         group: root
         mode: 0600
-        force: yes
-      register: nmconnection
+      with_items: "{{ wireguard_clients }}"
 
-    - name: reload connection
-      ansible.builtin.command: "nmcli c reload"
-      when: nmconnection.changed
-    - name: reapply config to interface
-      ansible.builtin.command: "nmcli d reapply {{ wireguard_iface }}"
-      when: nmconnection.changed
+    - name: generate qr codes
+      ansible.builtin.command: "qrencode -o {{ wireguard_files }}/{{ item }}.png < {{ wireguard_files }}/{{ item }}.conf"
+      with_items: "{{ wireguard_clients }}"
 
-- name: netfiler and ip forwarding configuration
-  block:
-    - name: Enable packet forwarding for IPv4
-      sysctl:
-        name: net.ipv4.ip_forward
-        value: 1
-        sysctl_set: yes
-        state: present
-        reload: yes
-
-    - name: Add WireGuard as a service to FirewallD
-      template:
-        src: firewalld.xml.j2
-        dest: /etc/firewalld/services/wireguard.xml
-        owner: root
-        group: root
-        mode: 0600
-      register: firewalld_service
-
-    - name: Reload firewalld to add/update wireguard service
-      ansible.builtin.command: "firewall-cmd --reload"
-      when: firewalld_service.changed
-
-    - name: Allow WireGuard service for FirewallD zone
-      firewalld:
-        zone: "{{ wireguard_firewalld_service_zone }}"
-        service: wireguard
-        state: enabled
-        permanent: yes
-        immediate: yes
-
-    - name: Add WireGuard interface to FirewallD zone
-      firewalld:
-        zone: "{{ wireguard_firewalld_zone }}"
-        interface: "{{ wireguard_iface }}"
-        state: enabled
-        permanent: yes
-        immediate: yes
-
-    - name: Enable Masquerading
-      firewalld:
-        zone: "{{ wireguard_firewalld_service_zone }}"
-        masquerade: yes
-        state: enabled
-        permanent: yes
-        immediate: yes
-
-    - name: Enable Masquerading for internal zone
-      firewalld:
-        zone: "{{ wireguard_firewalld_zone }}"
-        masquerade: yes
-        state: enabled
-        permanent: yes
-        immediate: yes
+    - name: Download conf files
+      ansible.builtin.fetch:
+        src: "{{ wireguard_files }}/{{ item }}.conf"
+        dest: "peer_configs/"
+        flat: yes
+    - name: Download qrcodes
+      ansible.builtin.fetch:
+        src: "{{ wireguard_files }}/{{ item }}.png"
+        dest: "peer_configs/"
+        flat: yes

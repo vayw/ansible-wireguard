@@ -12,10 +12,10 @@ listen-port={{ wireguard_server_port }}
 private-key={{ wireguard_private_key }}
 private-key-flags=0
 
-{% for name, key, ip in wireguard_clients %}
+{% for name in wireguard_clients %}
 # {{ name }}
-[wireguard-peer.{{ key }}]
-allowed-ips={{ ip }}/32
+[wireguard-peer.{{ wireguard_clients_pubkeys[name] }}]
+allowed-ips={{ wireguard_clients_ips[name] }}/32
 {% endfor %}
 
 [ipv4]

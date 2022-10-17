@@ -1,0 +1,8 @@
+[Interface]
+PrivateKey = {{ wireguard_clients_keys[name] }}
+Address = {{ wireguard_clients_ips[name] }}
+
+[Peer]
+PublicKey = {{ wireguard_pub_key }}
+AllowedIPs = 0.0.0.0/0
+Endpoint = {{ wireguard_endpoint | default(ansible_default_ipv4.address) }}:{{ wireguard_server_port }}

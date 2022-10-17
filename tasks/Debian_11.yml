@@ -3,5 +3,5 @@
 - name: install packages
   tags: system
   ansible.builtin.package:
-    name: ["wireguard", "firewalld", "network-manager"]
+    name: ["wireguard", "firewalld", "network-manager", "qrencode"]
     state: present
