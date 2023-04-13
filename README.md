@@ -24,6 +24,13 @@ wireguard_nm_connections_folder: /etc/NetworkManager/system-connections
 
 ```
 
+Optional variables
+------------
+```
+wireguard_clients_dns: 1.1.1.1 # will set DNS option in config
+```
+
+
 Dependencies
 ------------
 

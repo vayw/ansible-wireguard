@@ -2,6 +2,7 @@
 # setup tasks for Debian 11
 - name: install packages
   tags: system
-  ansible.builtin.package:
+  ansible.builtin.apt:
     name: ["wireguard", "firewalld", "network-manager", "qrencode"]
     state: present
+    update_cache: yes

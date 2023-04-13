@@ -267,7 +267,7 @@
       with_items: "{{ wireguard_clients }}"
 
     - name: generate qr codes
-      ansible.builtin.command: "qrencode -o {{ wireguard_files }}/{{ item }}.png < {{ wireguard_files }}/{{ item }}.conf"
+      ansible.builtin.command: "qrencode -o {{ wireguard_files }}/{{ item }}.png -r {{ wireguard_files }}/{{ item }}.conf"
       with_items: "{{ wireguard_clients }}"
 
     - name: Download conf files

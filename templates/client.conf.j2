@@ -1,6 +1,7 @@
 [Interface]
 PrivateKey = {{ wireguard_clients_keys[item] }}
 Address = {{ wireguard_clients_ips[item] }}
+{% if wireguard_clients_dns is defined %}DNS = {{ wireguard_clients_dns }}{% endif %}
 
 [Peer]
 PublicKey = {{ wireguard_pub_key }}
